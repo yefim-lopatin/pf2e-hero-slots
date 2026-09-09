@@ -1,0 +1,62 @@
+<section class="hs-shell">
+  <header class="hs-intro">
+    <span class="hs-eyebrow"><span class="hs-star" aria-hidden="true">✦</span> ГЕРОИЧЕСКАЯ СЛОТ-МАШИНА</span>
+    <h2>{{#if isGM}}Удача для героев{{else}}Испытай удачу{{/if}}</h2>
+    <p>{{#if isGM}}Один розыгрыш. Шанс для каждого.{{else}}{{actorName}}{{/if}}</p>
+  </header>
+
+  {{#if isGM}}
+  <div class="hs-gm-panel">
+    <div class="hs-status-tag {{#if active}}is-live{{/if}}"><span aria-hidden="true">●</span> {{#if active}}Розыгрыш открыт{{else}}Готово к запуску{{/if}}</div>
+    <label class="hs-setting" for="hs-rerolls">
+      <span>Дополнительные перебросы<small>У каждого игрока есть ещё одна начальная попытка.</small></span>
+      <input id="hs-rerolls" name="rerolls" type="number" min="0" max="100" step="1" required value="{{rerolls}}" {{#if active}}disabled{{/if}}>
+    </label>
+    {{#if active}}
+      <p class="hs-rule">Всего попыток на игрока: <strong>{{total}}</strong>. Выигрывать можно несколько раз.</p>
+      <button type="button" class="hs-secondary" data-slot-action="end" {{#if busy}}disabled{{/if}}>Завершить розыгрыш</button>
+    {{else}}
+      <button type="button" class="hs-primary" data-slot-action="start" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-play" aria-hidden="true"></i> Открыть всем игрокам</button>
+    {{/if}}
+    {{#if hasPending}}<button type="button" class="hs-secondary" data-slot-action="recover" {{#if busy}}disabled{{/if}}>Повторить сохранение результата</button>{{/if}}
+  </div>
+  {{#if roster.length}}
+  <div class="hs-roster" aria-label="Результаты игроков">
+    <div class="hs-roster-heading"><span>Игроки</span><span>Попытки / очки</span></div>
+    {{#each roster}}
+    <div class="hs-player-row">
+      <span class="hs-online {{#if online}}is-online{{/if}}" title="{{#if online}}В сети{{else}}Не в сети{{/if}}"></span>
+      <div class="hs-player-name"><strong>{{name}}</strong><small>{{actor}}</small><span class="hs-player-result">{{result}}</span></div>
+      <div class="hs-player-score"><span>{{used}} / {{total}}</span><strong>+{{awarded}} <span aria-label="героических очков">✦</span></strong></div>
+    </div>
+    {{/each}}
+  </div>
+  {{/if}}
+  {{else}}
+  <div class="hs-machine {{#if busy}}is-spinning{{/if}} {{#if resultWin}}is-winner{{/if}}">
+    <div class="hs-machine-top" aria-hidden="true"><span>✧</span><span>✦</span><span>✧</span></div>
+    <div class="hs-reels" aria-label="Барабаны слот-машины" aria-busy="{{busy}}">
+      {{#each reels}}
+      <div class="hs-reel" data-reel="{{@index}}">
+        {{#if ../busy}}
+          <div class="hs-strip" aria-hidden="true">{{#each ../strip}}<span class="hs-symbol symbol-{{id}}">{{glyph}}</span>{{/each}}</div>
+        {{else}}
+          <span class="hs-symbol symbol-{{id}}" role="img" aria-label="{{label}}">{{glyph}}</span>
+        {{/if}}
+      </div>
+      {{/each}}
+    </div>
+    <div class="hs-payline" aria-hidden="true"><span>◆</span><span>ТРИ В РЯД</span><span>◆</span></div>
+  </div>
+  <div class="hs-result {{#if resultWin}}is-winner{{/if}}" role="status" aria-live="polite" aria-atomic="true"><h3>{{headline}}</h3><p>{{detail}}</p></div>
+  <div class="hs-counters">
+    <div><span>Осталось попыток</span><strong>{{remaining}} <small>/ {{total}}</small></strong></div>
+    <div><span>Героические очки</span><strong>{{heroValue}} <small>/ {{heroMax}}</small></strong></div>
+  </div>
+  <button type="button" class="hs-primary hs-spin" data-slot-action="spin" {{#unless canSpin}}disabled{{/unless}}><i class="fa-solid fa-rotate" aria-hidden="true"></i> {{spinLabel}}</button>
+  <p class="hs-earned">Получено за розыгрыш: <strong>+{{awarded}} ✦</strong></p>
+  {{/if}}
+
+  {{#if error}}<p class="hs-error" role="alert">{{error}}</p>{{/if}}
+  <footer class="hs-footer">Любые три одинаковых символа → +1 героическое очко.<br>Выигрыш не отменяет оставшиеся попытки. Предел очков сохраняется.</footer>
+</section>
