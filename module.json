@@ -1,15 +1,37 @@
 {
   "id": "pf2e-hero-slots",
   "title": "Героическая слот-машина",
-  "description": "ГМ открывает слот-машину всем игрокам. Три одинаковых символа дают героическое очко, число перебросов задаёт ГМ.",
-  "version": "1.0.0",
+  "description": "Героическая слот-машина: выбор игроков и дополнительные попытки за указанную ГМ цену с подтверждением в чате.",
+  "version": "1.1.0",
   "url": "https://github.com/yefim-lopatin/pf2e-hero-slots",
   "manifest": "https://github.com/yefim-lopatin/pf2e-hero-slots/releases/latest/download/module.json",
-  "download": "https://github.com/yefim-lopatin/pf2e-hero-slots/releases/download/v1.0.0/pf2e-hero-slots.zip",
-  "compatibility": { "minimum": "14.361", "verified": "14.367", "maximum": "14" },
-  "authors": [{ "name": "Yefim Lopatin" }],
-  "esmodules": ["scripts/module.js"],
-  "styles": ["styles/slots.css"],
-  "relationships": { "systems": [{ "id": "pf2e", "type": "system", "compatibility": { "minimum": "8.5.0" } }] },
+  "download": "https://github.com/yefim-lopatin/pf2e-hero-slots/releases/download/v1.1.0/pf2e-hero-slots.zip",
+  "compatibility": {
+    "minimum": "14.361",
+    "verified": "14.367",
+    "maximum": "14"
+  },
+  "authors": [
+    {
+      "name": "Yefim Lopatin"
+    }
+  ],
+  "esmodules": [
+    "scripts/module.js"
+  ],
+  "styles": [
+    "styles/slots.css"
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "pf2e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "8.5.0"
+        }
+      }
+    ]
+  },
   "socket": true
 }

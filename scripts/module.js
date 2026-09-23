@@ -11,6 +11,9 @@ class SlotsController {
     this.pending = new Map();
     this.openedRound = null;
     this.session = new SlotsSession({
+      config: () => this.config,
+      saveConfig: config => game.settings.set(MODULE_ID, "access", config),
+      publish: state => this.publish(state),
       isAuthority: () => game.user.isGM && game.users.activeGM?.id === game.user.id,
       users: () => game.users.contents,
       state: () => this.state,
@@ -21,6 +24,22 @@ class SlotsController {
       owns: (actor, user) => actor.testUserPermission(user, "OWNER")
     });
     game.socket.on(CHANNEL, (message, senderId) => this.onSocket(message, senderId));
+  }
+
+  get config() { return game.settings.get(MODULE_ID, "access"); }
+
+  async publish(state) {
+    const escape = value => String(value).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    for (const p of state.purchases ?? []) {
+      const status = !state.active && p.status === "pending" ? "closed" : p.status;
+      const message = game.messages.find(m => m.getFlag(MODULE_ID, "purchase")?.id === p.id && m.getFlag(MODULE_ID, "purchase")?.roundId === state.id);
+      if (message?.getFlag(MODULE_ID, "purchase")?.status === status) continue;
+      const labels = { pending: "Ожидает решения ГМ", approved: "Одобрено — попытки начислены", rejected: "Отклонено", closed: "Розыгрыш завершён" };
+      const content = `<section class="hs-price-chat"><h3>✦ Попытки за цену</h3><strong>${escape(p.name)}</strong><p>${escape(p.label)}</p><p>Попыток: <b>${p.attempts}</b></p><p>${labels[status]}</p>${status === "pending" ? '<div class="hs-decision"><button type="button" data-hs-approve="yes">Одобрить</button><button type="button" data-hs-approve="no">Отклонить</button></div>' : ""}</section>`;
+      const data = { content, [`flags.${MODULE_ID}.purchase`]: { id: p.id, roundId: state.id, status } };
+      if (message) await message.update(data);
+      else await ChatMessage.create({ ...data, speaker: { alias: "Героическая слот-машина" } });
+    }
   }
 
   get state() { return game.settings.get(MODULE_ID, "round"); }
@@ -42,7 +61,7 @@ class SlotsController {
     const state = this.state;
     if (state?.active && state.id !== this.openedRound) {
       this.openedRound = state.id;
-      this.open();
+      if (game.user.isGM || this.config.allowedIds === null || this.config.allowedIds.includes(game.user.id)) this.open();
     } else if (this.application?.rendered) {
       this.application.render().catch(error => console.error(MODULE_ID, error));
     }
@@ -109,7 +128,24 @@ class SlotsController {
   recover() { return this.request("recover"); }
 }
 
+Hooks.on("renderChatMessageHTML", (message, element) => {
+  const purchase = message.getFlag(MODULE_ID, "purchase");
+  if (!purchase) return;
+  const root = element instanceof HTMLElement ? element : element[0];
+  if (!game.user.isGM) { root.querySelector(".hs-decision")?.remove(); return; }
+  root.querySelectorAll("[data-hs-approve]").forEach(button => button.addEventListener("click", async () => {
+    button.disabled = true;
+    try { await controller.request("decide", { roundId: purchase.roundId, purchaseId: purchase.id, approve: button.dataset.hsApprove === "yes" }); }
+    catch (error) { ui.notifications.error(error.message); }
+    finally { button.disabled = false; }
+  }));
+});
+
 Hooks.once("init", () => {
+  game.settings.register(MODULE_ID, "access", {
+    scope: "world", config: false, type: Object,
+    default: { allowedIds: null, enabled: false, prices: [] }, onChange: () => controller?.refresh()
+  });
   game.settings.register(MODULE_ID, "round", {
     scope: "world", config: false, type: Object, default: null, onChange: () => controller?.refresh()
   });

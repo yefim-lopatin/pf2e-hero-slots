@@ -133,3 +133,65 @@ test("Активный розыгрыш нельзя перезапустить;
   await assert.rejects(f.session.handle("p1", { action: "spin", roundId: id, requestId: "oldrequest", expectedUsed: 0 }), /уже закончился/);
   assert.equal(f.state.entries.p1.used, 0);
 });
+
+
+test("Доступ запрещает вращение и заявку; только ГМ меняет настройки", async () => {
+  const f = fixture();
+  let config = { allowedIds: null, enabled: false, prices: [] };
+  f.env.config = () => config;
+  f.env.saveConfig = async value => { config = value; };
+  const request = { action: "configure", config: { allowedIds: ["p1"], enabled: true, prices: [{ label: "10 урона", attempts: 3 }] } };
+  await assert.rejects(f.session.handle("p1", request), /Только ГМ/);
+  await f.session.handle("gm", request);
+  await f.start(0);
+  await assert.rejects(f.spin("p2"), /запретил/);
+  await assert.rejects(f.session.handle("p2", { action: "purchase", roundId: f.state.id, priceId: config.prices[0].id }), /не разрешено/);
+  assert.equal(f.state.entries.p2.used, 0);
+});
+
+test("Цена сохраняется в заявке, решение только ГМ, начисление ровно один раз", async () => {
+  const f = fixture();
+  const config = { allowedIds: ["p1", "p2"], enabled: true, prices: [{ id: "price", label: "Получить 10 ментального урона", attempts: 3 }] };
+  f.env.config = () => config;
+  await f.start(0);
+  const request = { action: "purchase", roundId: f.state.id, priceId: "price", attempts: 99 };
+  await f.session.handle("p1", request);
+  assert.equal(f.state.entries.p1.bonus, undefined);
+  assert.equal(f.state.purchases[0].attempts, 3);
+  await assert.rejects(f.session.handle("p1", request), /Дождитесь/);
+  config.prices[0].attempts = 8;
+  const decision = { action: "decide", roundId: f.state.id, purchaseId: f.state.purchases[0].id, approve: true };
+  await assert.rejects(f.session.handle("p1", decision), /Только ГМ/);
+  await Promise.all([f.session.handle("gm", decision), f.session.handle("gm", decision)]);
+  assert.equal(f.state.entries.p1.bonus, 3);
+  assert.equal(f.state.entries.p2.bonus, undefined);
+  for (let i = 0; i < 4; i++) await f.spin();
+  await assert.rejects(f.spin(), /Все попытки/);
+  await f.session.handle("p1", request);
+  const rejected = { ...decision, purchaseId: f.state.purchases[1].id, approve: false };
+  await f.session.handle("gm", rejected);
+  assert.equal(f.state.entries.p1.bonus, 3);
+  await f.session.handle("gm", { ...rejected, approve: true });
+  assert.equal(f.state.entries.p1.bonus, 3);
+});
+
+test("Закрытый розыгрыш и запрет доступа блокируют одобрение; сбой чата не дублирует начисление", async () => {
+  const f = fixture();
+  const config = { allowedIds: ["p1"], enabled: true, prices: [{ id: "price", label: "Цена", attempts: 2 }] };
+  f.env.config = () => config;
+  await f.start(0);
+  await f.session.handle("p1", { action: "purchase", roundId: f.state.id, priceId: "price" });
+  const decision = { action: "decide", roundId: f.state.id, purchaseId: f.state.purchases[0].id, approve: true };
+  config.allowedIds = [];
+  await assert.rejects(f.session.handle("gm", decision), /Сначала разрешите/);
+  config.allowedIds = ["p1"];
+  f.env.publish = async state => { if (state.purchases?.[0].status === "approved") throw new Error("chat failed"); };
+  await assert.rejects(f.session.handle("gm", decision), /chat failed/);
+  assert.equal(f.state.entries.p1.bonus, 2);
+  f.env.publish = async () => {};
+  f.reconnect();
+  await f.session.handle("gm", decision);
+  assert.equal(f.state.entries.p1.bonus, 2);
+  await f.session.handle("gm", { action: "end", roundId: f.state.id });
+  await assert.rejects(f.session.handle("gm", decision), /завершил/);
+});

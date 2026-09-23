@@ -20,6 +20,8 @@ export class SlotsApplication extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   async _prepareContext() {
+    const config = this.controller.config;
+    const allowed = config.allowedIds === null || config.allowedIds.includes(game.user.id);
     const state = this.controller.state;
     const entry = state?.entries?.[game.user.id];
     const result = entry?.last;
@@ -27,12 +29,13 @@ export class SlotsApplication extends HandlebarsApplicationMixin(ApplicationV2) 
     const isGM = game.user.isGM;
     const hasGM = Boolean(game.users.activeGM);
     const pending = result?.status === "pending";
-    const remaining = entry && state ? Math.max(0, state.total - entry.used) : 0;
+    const remaining = entry && state ? Math.max(0, state.total + (entry.bonus ?? 0) - entry.used) : 0;
     const validActor = actor?.type === "character" && game.user.character?.id === actor.id &&
       actor.testUserPermission(game.user, "OWNER");
     let headline = "Три одинаковых — одно героическое очко";
     let detail = "Нажми на кнопку, чтобы запустить барабаны.";
     if (!state?.active) { headline = "Розыгрыш завершён"; detail = "Следующий розыгрыш начнёт ГМ."; }
+    else if (!allowed && !isGM) { headline = "Доступ закрыт"; detail = "ГМ не разрешил тебе крутить слоты."; }
     else if (!entry && !isGM) { headline = "Ты пока не участвуешь"; detail = "Попроси ГМ начать новый розыгрыш."; }
     else if (!validActor && !isGM) { headline = "Нужен назначенный персонаж"; detail = "ГМ должен назначить тебе персонажа с правом владельца и начать новый розыгрыш."; }
     else if (result?.status === "complete") {
@@ -43,14 +46,17 @@ export class SlotsApplication extends HandlebarsApplicationMixin(ApplicationV2) 
     if (this.busy || pending) { headline = this.busy ? "Пусть повезёт…" : "ГМ сохраняет результат…"; detail = "Повторно нажимать не нужно."; }
     if (!hasGM) { headline = "Ожидаем ГМ"; detail = "Продолжить можно, когда ведущий подключится."; }
     return {
+      config, players: game.users.contents.filter(u => !u.isGM).map(u => ({ id: u.id, name: u.name, allowed: config.allowedIds === null || config.allowedIds.includes(u.id) })),
+      canPurchase: Boolean(allowed && state?.active && entry && hasGM && config.enabled),
+      purchasePending: (state?.purchases ?? []).some(p => p.userId === game.user.id && p.status === "pending"),
       isGM, state, active: Boolean(state?.active), hasGM, busy: this.busy, error: this.error,
-      actorName: actor?.name ?? "Персонаж не назначен", remaining, total: state?.total ?? 0,
+      actorName: actor?.name ?? "Персонаж не назначен", remaining, total: entry ? state.total + (entry.bonus ?? 0) : state?.total ?? 0,
       awarded: entry?.awarded ?? 0, heroValue: actor?.system.resources?.heroPoints?.value ?? "—",
       heroMax: actor?.system.resources?.heroPoints?.max ?? "—", headline, detail,
       resultWin: !this.busy && result?.status === "complete" && result.win,
       reels: glyphs(!this.busy && result?.status === "complete" ? result.symbols : ["cherry", "lemon", "seven"]),
       strip: [...SYMBOLS, ...SYMBOLS],
-      canSpin: Boolean(state?.active && entry && validActor && remaining && !this.busy && !pending && hasGM),
+      canSpin: Boolean(allowed && state?.active && entry && validActor && remaining && !this.busy && !pending && hasGM),
       spinLabel: this.busy ? "Барабаны вращаются…" : remaining === 0 && entry ? "Попытки закончились" : entry?.used ? "Крутить ещё" : "Испытать удачу",
       rerolls: state?.active ? state.rerolls : game.settings.get(MODULE_ID, "rerolls"),
       hasPending: Object.values(state?.entries ?? {}).some(e => e.last?.status === "pending"),
@@ -59,7 +65,7 @@ export class SlotsApplication extends HandlebarsApplicationMixin(ApplicationV2) 
         const a = game.actors.get(e.actorId);
         return {
           name: u?.name ?? "Удалённый игрок", actor: a?.name ?? "Не назначен персонаж",
-          online: Boolean(u?.active), used: e.used, total: state.total, awarded: e.awarded,
+          online: Boolean(u?.active), used: e.used, total: state.total + (e.bonus ?? 0), awarded: e.awarded,
           result: e.last?.status === "complete" ? glyphs(e.last.symbols).map(s => s.glyph).join(" ") : e.last ? "Сохранение…" : "Ожидает попытку"
         };
       })
@@ -67,16 +73,45 @@ export class SlotsApplication extends HandlebarsApplicationMixin(ApplicationV2) 
   }
 
   _onRender() {
+    const root = this.element;
+    root.querySelector("[data-slot-action='add-price']")?.addEventListener("click", () => {
+      const row = document.createElement("div");
+      row.className = "hs-price-row";
+      row.innerHTML = '<input name="price-label" aria-label="Цена словами" placeholder="Получить 10 ментального урона" maxlength="1000" required><input name="price-attempts" aria-label="Количество попыток" type="number" min="1" max="100" value="1" required><button type="button" data-remove-price aria-label="Удалить цену">×</button>';
+      root.querySelector(".hs-prices").append(row);
+    });
+    root.querySelector(".hs-prices")?.addEventListener("click", event => {
+      if (event.target.closest("[data-remove-price]")) event.target.closest(".hs-price-row").remove();
+    });
+    root.querySelector("[data-slot-action='save-access']")?.addEventListener("click", () => this.run(() => this.saveAccess()));
+    root.querySelectorAll("[data-price-id]").forEach(button => button.addEventListener("click", () => this.run(() =>
+      this.controller.request("purchase", { roundId: this.controller.state?.id, priceId: button.dataset.priceId }))));
     this.element.querySelector("[data-slot-action='spin']")?.addEventListener("click", () => this.spin());
     this.element.querySelector("[data-slot-action='start']")?.addEventListener("click", () => this.run(async () => {
       const input = this.element.querySelector("[name='rerolls']");
       if (!input.reportValidity()) return;
       const rerolls = Number(input.value);
+      await this.saveAccess();
       await this.controller.start(rerolls);
       await game.settings.set(MODULE_ID, "rerolls", rerolls);
     }));
     this.element.querySelector("[data-slot-action='end']")?.addEventListener("click", () => this.run(() => this.controller.end()));
     this.element.querySelector("[data-slot-action='recover']")?.addEventListener("click", () => this.run(() => this.controller.recover()));
+  }
+
+  async saveAccess() {
+    const root = this.element;
+    const inputs = [...root.querySelectorAll(".hs-prices input")];
+    if (inputs.some(input => !input.reportValidity())) throw new Error("Заполните цены и количество попыток.");
+    const config = {
+      allowedIds: [...root.querySelectorAll("[name='allowed-player']:checked")].map(input => input.value),
+      enabled: root.querySelector("[name='prices-enabled']").checked,
+      prices: [...root.querySelectorAll(".hs-price-row")].map(row => ({
+        label: row.querySelector("[name='price-label']").value,
+        attempts: Number(row.querySelector("[name='price-attempts']").value)
+      }))
+    };
+    await this.controller.request("configure", { config });
   }
 
   async run(action) {

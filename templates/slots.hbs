@@ -2,11 +2,20 @@
   <header class="hs-intro">
     <span class="hs-eyebrow"><span class="hs-star" aria-hidden="true">✦</span> ГЕРОИЧЕСКАЯ СЛОТ-МАШИНА</span>
     <h2>{{#if isGM}}Удача для героев{{else}}Испытай удачу{{/if}}</h2>
-    <p>{{#if isGM}}Один розыгрыш. Шанс для каждого.{{else}}{{actorName}}{{/if}}</p>
+    <p>{{#if isGM}}Участников и условия выбирает ГМ.{{else}}{{actorName}}{{/if}}</p>
   </header>
 
   {{#if isGM}}
   <div class="hs-gm-panel">
+    <h3>Кому разрешено крутить</h3>
+    {{#each players}}<label class="hs-access"><input type="checkbox" name="allowed-player" value="{{id}}" {{#if allowed}}checked{{/if}}> {{name}}</label>{{/each}}
+    <label class="hs-access"><input type="checkbox" name="prices-enabled" {{#if config.enabled}}checked{{/if}}> Включить попытки за цену</label>
+    <p>Цена словами и количество попыток. Последствия ГМ применяет вручную.</p>
+    <div class="hs-prices">
+      {{#each config.prices}}<div class="hs-price-row"><input name="price-label" aria-label="Цена словами" value="{{label}}" maxlength="1000" required><input name="price-attempts" aria-label="Количество попыток" type="number" min="1" max="100" value="{{attempts}}" required><button type="button" data-remove-price aria-label="Удалить цену">×</button></div>{{/each}}
+    </div>
+    <button type="button" class="hs-secondary" data-slot-action="add-price">Добавить цену</button>
+    <button type="button" class="hs-secondary" data-slot-action="save-access" {{#if busy}}disabled{{/if}}>Сохранить доступ и цены</button>
     <div class="hs-status-tag {{#if active}}is-live{{/if}}"><span aria-hidden="true">●</span> {{#if active}}Розыгрыш открыт{{else}}Готово к запуску{{/if}}</div>
     <label class="hs-setting" for="hs-rerolls">
       <span>Дополнительные перебросы<small>У каждого игрока есть ещё одна начальная попытка.</small></span>
@@ -16,7 +25,7 @@
       <p class="hs-rule">Всего попыток на игрока: <strong>{{total}}</strong>. Выигрывать можно несколько раз.</p>
       <button type="button" class="hs-secondary" data-slot-action="end" {{#if busy}}disabled{{/if}}>Завершить розыгрыш</button>
     {{else}}
-      <button type="button" class="hs-primary" data-slot-action="start" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-play" aria-hidden="true"></i> Открыть всем игрокам</button>
+      <button type="button" class="hs-primary" data-slot-action="start" {{#if busy}}disabled{{/if}}><i class="fa-solid fa-play" aria-hidden="true"></i> Открыть выбранным игрокам</button>
     {{/if}}
     {{#if hasPending}}<button type="button" class="hs-secondary" data-slot-action="recover" {{#if busy}}disabled{{/if}}>Повторить сохранение результата</button>{{/if}}
   </div>
@@ -54,6 +63,11 @@
     <div><span>Героические очки</span><strong>{{heroValue}} <small>/ {{heroMax}}</small></strong></div>
   </div>
   <button type="button" class="hs-primary hs-spin" data-slot-action="spin" {{#unless canSpin}}disabled{{/unless}}><i class="fa-solid fa-rotate" aria-hidden="true"></i> {{spinLabel}}</button>
+  {{#if canPurchase}}<div class="hs-purchase-panel"><h3>Попытки за цену</h3>
+    {{#if purchasePending}}<p>Заявка отправлена в чат. Дождись решения ГМ.</p>{{else}}
+    {{#each config.prices}}<button type="button" class="hs-secondary" data-price-id="{{id}}" {{#if ../busy}}disabled{{/if}}>{{label}} — {{attempts}} попыток</button>{{else}}<p>ГМ пока не добавил цены.</p>{{/each}}
+    {{/if}}
+  </div>{{/if}}
   <p class="hs-earned">Получено за розыгрыш: <strong>+{{awarded}} ✦</strong></p>
   {{/if}}
 

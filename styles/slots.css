@@ -76,3 +76,12 @@
 .hero-slots .hs-error { border: 1px solid #ce8977; color: #ffcab9; background: #462d2b; border-radius: 6px; padding: 10px; font-size: 13px; line-height: 1.5; margin: 16px 0 0; }
 @media (max-width: 520px) { .hero-slots .hs-shell { padding: 20px 16px; } .hero-slots h2 { font-size: 27px; } .hero-slots .hs-symbol { font-size: 44px; } .hero-slots .symbol-seven { font-size: 67px; } }
 @media (prefers-reduced-motion: reduce) { .hero-slots .hs-strip { animation: none; } }
+
+.hero-slots .hs-access { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+.hero-slots .hs-price-row { display: grid; grid-template-columns: minmax(0, 1fr) 65px 32px; gap: 6px; margin: 8px 0; }
+.hero-slots .hs-price-row input { width: 100%; color: #f6f3e9; background: #142c30; }
+.hero-slots .hs-purchase-panel { margin-top: 20px; }
+.hero-slots .hs-purchase-panel button { white-space: normal; height: auto; overflow-wrap: anywhere; }
+.hs-price-chat { background: linear-gradient(135deg, #263e49, #3d2954); color: #fff7e4; border: 2px solid #cda967; border-radius: 10px; padding: 14px; overflow-wrap: anywhere; }
+.hs-price-chat h3 { color: #ffe0a3; }
+.hs-price-chat button { background: #fff0cf; color: #241c31; }
