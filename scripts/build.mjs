@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const manifest = JSON.parse(await readFile(join(root, "module.json"), "utf8"));
-if (manifest.id !== "pf2e-hero-slots" || manifest.compatibility.verified !== "14.367" || !manifest.socket ||
+if (manifest.id !== "pf2e-hero-slots" || manifest.compatibility.verified !== "14.368" || !manifest.socket ||
     manifest.relationships.systems[0].id !== "pf2e") throw new Error("Некорректный манифест");
 for (const file of [...manifest.esmodules, ...manifest.styles, "templates/slots.hbs", "README.md"]) await access(join(root, file));
 for (const file of (await readdir(join(root, "scripts"))).filter(f => f.endsWith(".js"))) {
